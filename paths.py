@@ -3,74 +3,78 @@ from collections import namedtuple, defaultdict
 
 
 Hub = namedtuple('Hub', ['name', 'currency'])
-Institution = namedtuple('Institution', ['name', 'accounts'])
+Institution = namedtuple('Institution', ['name', 'accounts', 'exchanges'])
 Account = namedtuple('Account', ['institution', 'name', 'currency', 'recieve', 'send'])
-Config = namedtuple('Config', ['currencies', 'hubs', 'institutions', 'pairs'])
-Pair = namedtuple('Pair', ['institution', 'account', 'hub', 'rate'])
+Exchange = namedtuple('Exchange', ['source', 'destination', 'buy', 'sell'])
+Config = namedtuple('Config', ['currencies', 'hubs', 'institutions'])
 
 config = Config(
     currencies=['zar', 'usd', 'btc'],
     hubs={
         'usd-cheque-card': Hub(name='usd-cheque-card', currency='usd'),
         'zar-eft': Hub(name='zar-eft', currency='zar'),
-        'usd-iban-transfer': Hub('iban-transfer', currency='usd'),
+        'usd-iban-transfer': Hub('usd-iban-transfer', currency='usd'),
         'btc-transfer': Hub(name='btc-transfer', currency='btc'),
     },
     institutions={
         'fnb': Institution(
             name='fnb',
-            accounts=[
-                Account(
+            accounts={
+                'cheque': Account(
                     institution='fnb',
                     name='cheque',
                     currency='zar',
-                    recieve=('eft', ),
-                    send=('eft', 'usd-cheque-card', )
+                    recieve=('zar-eft', ),
+                    send=('zar-eft', 'usd-cheque-card', )
                 )
-            ]
+            },
+            exchanges=[],
         ),
         'luno': Institution(
             name='luno',
-            accounts=[
-                Account(
+            accounts={
+                'zar-wallet': Account(
+                    institution='luno',
+                    name='zar-wallet',
+                    currency='zar',
+                    recieve=('zar-eft', ),
+                    send=('zar-eft', ),
+                ),
+                'btc-wallet': Account(
                     institution='luno',
                     name='btc-wallet',
                     currency='btc',
                     recieve=('btc-transfer', ),
                     send=('btc-transfer', ),
-                ),
-                Account(
-                    institution='luno',
-                    name='zar-wallet',
-                    currency='zar',
-                    recieve=('eft', ),
-                    send=('eft', ),
                 )
+            },
+            exchanges=[
+                Exchange('zar-wallet', 'btc-wallet', Decimal(1), Decimal(1))
             ]
         ),
         'cex': Institution(
             name='cex',
-            accounts=[
-                Account(
+            accounts={
+                'usd-wallet': Account(
+                    institution='cex',
+                    name='usd-wallet',
+                    currency='btc',
+                    recieve=('usd-cheque-card', ),
+                    send=('usd-iban-transfer', ),
+                ),
+                'btc-wallet': Account(
                     institution='cex',
                     name='btc-wallet',
                     currency='btc',
                     recieve=('btc-transfer', ),
                     send=('btc-transfer', )
-                ),
-                Account(
-                    institution='cex',
-                    name='usd-wallet',
-                    currency='btc',
-                    recieve=('cheque-card', ),
-                    send=('iban-transfer', ),
                 )
+            },
+            exchanges=[
+                Exchange('usd-wallet', 'btc-wallet', Decimal(1), Decimal(1))
             ]
         )
     },
-    pairs=[
-        Pair('fnb', 'cheque', 'usd-cheque-card', Decimal(0.1)),
-    ]
 )
 
 
@@ -90,18 +94,21 @@ import matplotlib.pyplot as plt
 
 def get_paths():
     graph = nx.Graph()
-    hubs = defaultdict(lambda: set())
     for institution in config.institutions.values():
-        for account in institution.accounts:
-            for hub in account.send:
-                print(f'linking {account.institution}-{account.name} => {hub}')
-                graph.add_nodes_from([account, hub])
+        for account in institution.accounts.values():
+            for hub_name in account.send:
+                hub = config.hubs[hub_name]
+                print(f'linking {account.institution}-{account.name} => {hub.name}')
                 graph.add_edge(account, hub)
-        for account in institution.accounts:
-            for hub in account.recieve:
-                print(f'linking {account.institution}-{account.name} <= {hub}')
-                graph.add_nodes_from([account, hub])
+        for account in institution.accounts.values():
+            for hub_name in account.recieve:
+                hub = config.hubs[hub_name]
+                print(f'linking {account.institution}-{account.name} <= {hub.name}')
                 graph.add_edge(hub, account)
+        for exchange in institution.exchanges:
+            source = institution.accounts[exchange.source]
+            destination = institution.accounts[exchange.destination]
+            graph.add_edge(source, destination)
     # plt.subplot(121)
     nx.draw(graph, with_labels=True, font_weight='bold')
     plt.show()
