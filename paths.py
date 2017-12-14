@@ -1,10 +1,12 @@
 from decimal import Decimal
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
 
 Hub = namedtuple('Hub', ['name', 'currency'])
+Hub.__str__ = lambda self: f'Hub({self.name})'
 Institution = namedtuple('Institution', ['name', 'accounts', 'exchanges'])
 Account = namedtuple('Account', ['institution', 'name', 'currency', 'recieve', 'send'])
+Account.__str__ = lambda self: f'Account({self.institution} {self.name})'
 Exchange = namedtuple('Exchange', ['source', 'destination', 'buy', 'sell'])
 Config = namedtuple('Config', ['currencies', 'hubs', 'institutions'])
 
